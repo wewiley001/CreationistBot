@@ -5,14 +5,17 @@ import ast
 import time
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QComboBox,
-    QPushButton, QListWidget, QLineEdit, QCheckBox, QMessageBox
+    QPushButton, QListWidget, QLineEdit, QCheckBox, QMessageBox,
+    QTextEdit, QScrollArea, QFrame
 )
+from PyQt5.QtGui import QTextCursor, QColor, QTextCharFormat
+from PyQt5.QtCore import Qt
 
 class MyForm(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Creationist - BGS Game Testing Bot")
+        self.setWindowTitle("Stellaris - Game Testing Bot")
         self.setGeometry(100, 100, 1000, 600)
 
         # UI elements
@@ -28,6 +31,12 @@ class MyForm(QWidget):
         self.loop_checkbox = QCheckBox("Loop queue continuously")
         self.queue_list = QListWidget()
 
+        self.log_screen = QTextEdit()
+        self.log_screen.setReadOnly(True)
+        self.log_screen.setFrameStyle(QFrame.Panel | QFrame.Sunken)
+        self.log_screen.setMinimumHeight(150)
+        self.log_screen.setStyleSheet("background-color: #111; color: #DDD;")
+
         self.label_functions.hide()
         self.dropdown_functions.hide()
         self.confirm_button.hide()
@@ -37,6 +46,7 @@ class MyForm(QWidget):
         self.label_wait.hide()
         self.input_wait.hide()
         self.loop_checkbox.hide()
+        self.log_screen.hide()
 
         # Queue list
         self.queued_functions = []
@@ -67,6 +77,8 @@ class MyForm(QWidget):
         layout.addWidget(self.loop_checkbox)
         layout.addWidget(self.run_button)
         layout.addWidget(self.clear_button)
+        layout.addWidget(QLabel("Execution Log:"))
+        layout.addWidget(self.log_screen)
 
         self.setLayout(layout)
 
@@ -104,6 +116,7 @@ class MyForm(QWidget):
             self.loop_checkbox.show()
             self.run_button.show()
             self.clear_button.show()
+            self.log_screen.show()
 
     def run_queue(self):
         try:
@@ -113,25 +126,27 @@ class MyForm(QWidget):
             return
 
         if wait_time > 0:
-            print(f"Waiting {wait_time} seconds before starting queue...")
+            self.append_log(f"Waiting {wait_time} seconds before starting queue...", color='gray')
             time.sleep(wait_time)
 
         looping = self.loop_checkbox.isChecked()
         while True:
             for script, func_name in self.queued_functions:
                 script_path = os.path.join(self.script_dir, script)
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
                 try:
                     spec = importlib.util.spec_from_file_location("module.name", script_path)
                     module = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(module)
                     func = getattr(module, func_name, None)
                     if callable(func):
-                        print(f"Running: {script}.{func_name}()")
+                        self.append_log(f"[{timestamp}] Running: {script}.{func_name}()", color='cyan')
                         func()
+                        self.append_log(f"[{timestamp}] Success: {script}.{func_name}() completed", color='green')
                     else:
-                        print(f"Function {func_name} not found in {script}.")
+                        self.append_log(f"[{timestamp}] Error: Function {func_name} not found in {script}.", color='red')
                 except Exception as e:
-                    print(f"Error running {script}.{func_name}(): {e}")
+                    self.append_log(f"[{timestamp}] Exception running {script}.{func_name}(): {e}", color='red')
 
             if not looping:
                 break
@@ -145,6 +160,27 @@ class MyForm(QWidget):
         self.label_wait.hide()
         self.input_wait.hide()
         self.loop_checkbox.hide()
+        self.log_screen.clear()
+        self.log_screen.hide()
+
+    def append_log(self, message, color='white'):
+        cursor = self.log_screen.textCursor()
+        cursor.movePosition(QTextCursor.End)
+
+        fmt = QTextCharFormat()
+        color_map = {
+            'red': QColor(Qt.red),
+            'green': QColor(Qt.green),
+            'cyan': QColor(Qt.cyan),
+            'gray': QColor(Qt.lightGray),
+            'white': QColor(Qt.white)
+        }
+        fmt.setForeground(color_map.get(color, QColor(Qt.white)))
+        cursor.insertText(message + '\n', fmt)
+
+        self.log_screen.setTextCursor(cursor)
+        self.log_screen.ensureCursorVisible()
+        print(message)
 
     def get_function_names(self, file_path):
         try:
