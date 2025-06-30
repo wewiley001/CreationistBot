@@ -15,7 +15,7 @@ class MyForm(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Stellaris - Game Testing Bot")
+        self.setWindowTitle("Creationist - BGS Game Testing Bot")
         self.setGeometry(100, 100, 1000, 600)
 
         # UI elements
